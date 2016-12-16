@@ -17,12 +17,17 @@ for i in range(len(timelist)):
 
 #********************************INITIALIZATION STEP**************************#
 n_data = len(x)
-n_states = 3
+n_states = 2
 
 x_states = [7, 8]
 n_xstates = len(x_states)
 
-# Initial probability vector pi
+occurence = np.empty(n_xstates)
+for i in range(n_xstates):
+    temp = np.where(x == x_states[i])[0]
+    occurence[i] = len(temp)/n_data
+
+# Initial probability vector for hidden states - pi
 pi = np.empty(n_states)
 for i in range(n_states):
     pi[i] = np.random.uniform(low=0.001, high=1.0)
@@ -39,10 +44,10 @@ for i in range(n_states):
     
 # Emission probability matrix B
 B = np.empty(shape=(n_xstates, n_states))
-for i in range(n_xstates):
-    for k in range(n_states):
-        B[i,k] = np.random.uniform(low=0.001, high=1.0)
-    B[i,:] = B[i,:]/np.sum(B[i,:])
+for k in range(n_states):
+    for i in range(n_xstates):
+        B[i,k] = occurence[i]
+
     
 # alpha_sc, beta_sc (scaled alpha and beta matrices), delta, epsilon and cn declaration
 alpha_sc = np.empty(shape=(n_data, n_states))
@@ -53,7 +58,7 @@ beta_base = np.empty(n_states)
 delta = np.empty(shape=(n_data, n_states))
 epsilon = np.empty(shape=(n_data, n_states))
 
-iter_total = 10
+iter_total = 100
 
 iter_no = 1
 
@@ -114,11 +119,17 @@ while iter_no <= iter_total:
     
     # Emission probability matrix B
     for i in range(n_xstates):
-        for j in range(n_states):
-            arg_list = np.where(x == x_states[i])[0]
-            #numerator = np.sum([alpha_sc[arg_list[e],j]*beta_sc[arg_list[e],j]*x[arg_list[e]] for e in range(len(arg_list))])
-            numerator = np.sum([alpha_sc[e,j]*beta_sc[e,j]*x[e] for e in arg_list])
-            B[i,j] = numerator/np.sum(alpha_sc[:,j]*beta_sc[:,j])
+        arg_list = np.where(x == x_states[i])[0]
+        for k in range(n_states):
+            numerator = 0
+            for n in range(n_data):
+                if x[n] == x_states[i]:
+                    numerator = numerator + alpha_sc[n,k]*beta_sc[n,k]
+            denominator = np.sum(np.array([alpha_sc[t,k]*beta_sc[t,k] for t in range(n_data)]))
+            B[i,k] = numerator/denominator
 
+    if (iter_no%10 == 0):
+        print(A)
+        print(B)
     print(iter_no)
     iter_no = iter_no + 1
