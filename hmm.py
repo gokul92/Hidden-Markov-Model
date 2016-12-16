@@ -3,6 +3,8 @@ from get_states import ohlc_classify
 import numpy as np
 
 #********************************READ FILE AND CREATE OBJECT *****************#
+
+# Change filename to point to file location
 fn = "/Users/gokul/Desktop/Finance/NIFTY/Intraday/india/NIFTY 50.csv"
 nifty_id = get_data_id(fn, 0)
 
@@ -112,7 +114,7 @@ while iter_no <= iter_total:
                     loc = np.where(x[n] == x_states)[0]
                     emis_prob = B[loc,l]
                     temp = temp + alpha_sc[n-1,i]*beta_sc[n,l]*emis_prob*A[i,l]/cn[n]
-                denominator = denominator + temp
+                denominator += temp
             Atemp[i,j] = numerator/denominator
     
     A[:] = Atemp
@@ -128,8 +130,31 @@ while iter_no <= iter_total:
             denominator = np.sum(np.array([alpha_sc[t,k]*beta_sc[t,k] for t in range(n_data)]))
             B[i,k] = numerator/denominator
 
-    if (iter_no%10 == 0):
-        print(A)
-        print(B)
     print(iter_no)
     iter_no = iter_no + 1
+
+
+# Given the learned parameters above, predicting the probable states for the next observation
+#********************************PREDICTION STEP****************************#
+
+# Calculating alpha as it is used in the prediction the next set of states.
+alpha = np.empty(shape=(n_data, n_states))
+for i in range(n_data):
+    ctemp = 1
+    for j in range(i+1):
+        ctemp = ctemp*cn[j]
+    alpha[i,:] = alpha_sc[i,:]*ctemp
+
+# Calculating probability of given set of observations X = (x1, x2, x3, ... xn)
+px = np.sum(alpha[-1,:])
+
+pnext = np.zeros(n_xstates)
+
+for k in range(n_xstates):
+    for i in range(n_states):
+        temp_sum = 0
+        for j in range(n_states):
+            temp_sum = temp_sum + alpha[-1,j]*A[i,j]
+        pnext[k] += temp_sum*B[k,i]/px
+
+print("probability of next trade taking the two possible states are ", pnext)
