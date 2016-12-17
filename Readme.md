@@ -23,4 +23,6 @@ The next step is the maximization step.
 The maximization step calculates the initial probability vector pi, the transition probability matrix A and emission probability matrix B
 based on the values of alpha and beta computed in the expectation step.
 
-The expectation and maximization steps are looped till convergence to an arbitrary level is reached.
+The expectation and maximization steps are looped till convergence to an arbitrary level is reached. Convergence is determined based on difference between successive values. 
+
+The learned parameters are used to predict the probability of states in the next time step. This is the expectation step. 
