@@ -1,22 +1,24 @@
 from get_data_class import get_data_id
 from get_states import ohlc_classify
 import numpy as np
+import sys
 
 # ********************************READ FILE AND CREATE OBJECT *****************#
 
 # Change filename to point to file location
 fn = "/Users/gokul/Desktop/Finance/NIFTY/Intraday/india/NIFTY 50.csv"
+#fn = "/Users/gokul/Desktop/Finance/Intraday Data/TN50/ADANIPORTS.csv"
 nifty_id = get_data_id(fn, 0)
 
 datelist = nifty_id.get_datelist()
 
-date = datelist[50]
+date = datelist[0]
 timelist = nifty_id.get_timelist(date)
 if len(timelist) % 2 == 0:
     timelength = len(timelist) / 2
 else:
     timelength = (len(timelist) - 1) / 2
-timelength = int(timelength)
+timelength = int(len(timelist))
 x = np.empty(timelength)
 for i in range(timelength):
     ohlc = nifty_id.get_min_ohlc(date, timelist[i])
@@ -64,7 +66,7 @@ beta_base = np.empty(n_states)
 delta = np.empty(shape=(n_data, n_states))
 epsilon = np.empty(shape=(n_data, n_states))
 
-iter_total = 100
+iter_total = 50
 
 iter_no = 1
 
@@ -74,7 +76,10 @@ while iter_no <= iter_total:
 
     # Calculating alpha_base, cn[0] and base for alpha_sc
     alpha_base = A[0, :]
-    cn[0] = np.sum(pi * B[0, :])
+
+    loc = np.where(x[0] == x_states)[0]
+    cn[0] = np.sum(pi * B[loc, :])
+
     alpha_sc[0, :] = alpha_base / cn[0]
     delta[0, :] = alpha_sc[0, :] * cn[0]
 
@@ -82,7 +87,10 @@ while iter_no <= iter_total:
         for j in range(n_states):
             loc = np.where(x[i] == x_states)[0]
             emis_prob = B[loc, j]
-            delta[i, j] = emis_prob * np.sum(alpha_sc[i - 1, :] * A[:, j])
+            temp = 0.0
+            for k in range(n_states):
+                temp += alpha_sc[i - 1, k] * A[k, j]
+            delta[i, j] = emis_prob * temp
         cn[i] = np.sum(delta[i, :])
         alpha_sc[i, :] = delta[i, :] / cn[i]
 
@@ -92,9 +100,12 @@ while iter_no <= iter_total:
     # epsilon[-1,:] not initialized with values. Thus do not use it anywhere !
     for i in range(n_data - 2, -1, -1):
         for j in range(n_states):
-            loc = np.where(x[i + 1] == x_states)[0]
-            emis_prob = B[loc, j]
-            epsilon[i, j] = np.sum(beta_sc[i + 1, :] * emis_prob * A[j, :])
+            temp = 0.0
+            for k in range(n_states):
+                loc = np.where(x[i + 1] == x_states)[0]
+                emis_prob = B[loc, k]
+                temp += beta_sc[i + 1, k] * emis_prob * A[j, k]
+            epsilon[i, j] = temp
         beta_sc[i, :] = epsilon[i, :] / cn[i + 1]
 
     # ********************************MAXIMIZATION STEP****************************#
@@ -104,23 +115,22 @@ while iter_no <= iter_total:
 
     # Transition probability matrix A
     Atemp = np.empty_like(A)
-    for i in range(n_states):
-        for j in range(n_states):
+    for j in range(n_states):
+        for k in range(n_states):
             numerator = 0
-            denominator = 0
-            for n in range(0, n_data - 1):
+            for n in range(1, n_data):
                 loc = np.where(x[n] == x_states)[0]
-                emis_prob = B[loc, i]
-                numerator = numerator + alpha_sc[n - 1, i] * beta_sc[n, j] * emis_prob * A[i, j] / cn[n]
+                emis_prob = B[loc, k]
+                numerator += alpha_sc[n - 1, j] * beta_sc[n, k] * emis_prob * A[j, k] / cn[n]
+            denominator = 0
             for l in range(n_states):
                 temp = 0
-                for n in range(0, n_data - 1):
+                for n in range(1, n_data):
                     loc = np.where(x[n] == x_states)[0]
                     emis_prob = B[loc, l]
-                    temp = temp + alpha_sc[n - 1, i] * beta_sc[n, l] * emis_prob * A[i, l] / cn[n]
+                    temp += alpha_sc[n - 1, j] * beta_sc[n, l] * emis_prob * A[j, l] / cn[n]
                 denominator += temp
-            Atemp[i, j] = numerator / denominator
-
+            Atemp[j, k] = numerator / denominator
     A[:] = Atemp
 
     # Emission probability matrix B
@@ -130,17 +140,23 @@ while iter_no <= iter_total:
             numerator = 0
             for n in range(n_data):
                 if x[n] == x_states[i]:
-                    numerator = numerator + alpha_sc[n, k] * beta_sc[n, k]
+                    numerator += alpha_sc[n, k] * beta_sc[n, k]
             denominator = np.sum(np.array([alpha_sc[t, k] * beta_sc[t, k] for t in range(n_data)]))
             B[i, k] = numerator / denominator
 
     print(iter_no)
     iter_no = iter_no + 1
 
-# Given the learned parameters above, predicting the probable states for the next observation
+# Given the learned parameters above, predicting the probable states for the next observation n+1
 # ********************************PREDICTION STEP****************************#
 
-# Calculating alpha as it is used in the prediction the next set of states.
+
+# Calculating probability of given set of observations X = (x1, x2, x3, ... xn)
+px = np.prod(cn)
+
+pnext = np.zeros(n_xstates)
+
+# Calculating alpha as it is used to predict the next state given X.
 alpha = np.empty(shape=(n_data, n_states))
 for i in range(n_data):
     ctemp = 1
@@ -148,16 +164,12 @@ for i in range(n_data):
         ctemp = ctemp * cn[j]
     alpha[i, :] = alpha_sc[i, :] * ctemp
 
-# Calculating probability of given set of observations X = (x1, x2, x3, ... xn)
-px = np.sum(alpha[-1, :])
-
-pnext = np.zeros(n_xstates)
-
 for k in range(n_xstates):
     for i in range(n_states):
         temp_sum = 0
         for j in range(n_states):
-            temp_sum = temp_sum + alpha[-1, j] * A[i, j]
+            temp_sum += alpha[-1, j] * A[j, i]
         pnext[k] += temp_sum * B[k, i] / px
 
 print("probability of next trade taking the two possible states are ", pnext)
+print(np.sum(pnext))
