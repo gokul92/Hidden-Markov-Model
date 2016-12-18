@@ -1,32 +1,50 @@
 from get_data_class import get_data_id
 from get_states import ohlc_classify
+from get_data_eod import get_data_eod
 import numpy as np
+import datetime
+import copy as cp
 import sys
+
+def output(x,start,end):
+    for i in range(start, end+1):
+        print(x[i])
+    return 0
 
 # ********************************READ FILE AND CREATE OBJECT *****************#
 
 # Change filename to point to file location
-fn = "/Users/gokul/Desktop/Finance/NIFTY/Intraday/india/NIFTY 50.csv"
-#fn = "/Users/gokul/Desktop/Finance/Intraday Data/TN50/ADANIPORTS.csv"
-nifty_id = get_data_id(fn, 0)
+# fn = "/Users/gokul/Desktop/Finance/NIFTY/Intraday/india/NIFTY 50.csv"
+fn = "/Users/gokul/Desktop/Data/Equity/EOD/Convert/HINDALCO.csv"
+status = "eod"
 
-datelist = nifty_id.get_datelist()
+if status == "id":
+    stock_id = get_data_id(fn, 0)
+    datelist = stock_id.get_datelist()
+    date = datelist[1]
+    timelist = stock_id.get_timelist(date)
+    timelength = int(len(timelist))
+    x = np.empty(timelength)
+    for i in range(timelength):
+        ohlc = stock_id.get_min_ohlc(date, timelist[i])
+        x[i] = ohlc_classify(ohlc[0], ohlc[1], ohlc[2], ohlc[3])
+elif status == "eod":
+    stock_eod = get_data_eod(fn, 0)
+    stock_dates = stock_eod.get_date()
+    timelength = len(stock_dates)
+    x = np.empty(timelength)
+    open_prices = stock_eod.get_open_price()
+    high_prices = stock_eod.get_high_price()
+    low_prices = stock_eod.get_low_price()
+    close_prices = stock_eod.get_close_price()
+    for i in range(timelength):
+        x[i] = ohlc_classify(open_prices[i], high_prices[i], low_prices[i], close_prices[i])
 
-date = datelist[0]
-timelist = nifty_id.get_timelist(date)
-if len(timelist) % 2 == 0:
-    timelength = len(timelist) / 2
-else:
-    timelength = (len(timelist) - 1) / 2
-timelength = int(len(timelist))
-x = np.empty(timelength)
-for i in range(timelength):
-    ohlc = nifty_id.get_min_ohlc(date, timelist[i])
-    x[i] = ohlc_classify(ohlc[0], ohlc[1], ohlc[2], ohlc[3])
-
+output(x, 0, 100)
+sys.exit()
 # ********************************INITIALIZATION STEP**************************#
 n_data = len(x)
-n_states = 2
+n_states = 4
 
 x_states = [7, 8]
 n_xstates = len(x_states)
@@ -35,6 +53,8 @@ occurence = np.empty(n_xstates)
 for i in range(n_xstates):
     temp = np.where(x == x_states[i])[0]
     occurence[i] = len(temp) / n_data
+
+print("prior occurence ", occurence)
 
 # Initial probability vector for hidden states - pi
 pi = np.empty(n_states)
@@ -144,6 +164,7 @@ while iter_no <= iter_total:
             denominator = np.sum(np.array([alpha_sc[t, k] * beta_sc[t, k] for t in range(n_data)]))
             B[i, k] = numerator / denominator
 
+    print(A)
     print(iter_no)
     iter_no = iter_no + 1
 
@@ -172,4 +193,4 @@ for k in range(n_xstates):
         pnext[k] += temp_sum * B[k, i] / px
 
 print("probability of next trade taking the two possible states are ", pnext)
-print(np.sum(pnext))
+print("sum of probabilities", np.sum(pnext))
