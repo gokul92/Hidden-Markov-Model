@@ -6,45 +6,58 @@ import datetime
 import copy as cp
 import sys
 
-def output(x,start,end):
-    for i in range(start, end+1):
+
+def output(x, start, end):
+    for i in range(start, end + 1):
         print(x[i])
     return 0
+
 
 # ********************************READ FILE AND CREATE OBJECT *****************#
 
 # Change filename to point to file location
-# fn = "/Users/gokul/Desktop/Finance/NIFTY/Intraday/india/NIFTY 50.csv"
-fn = "/Users/gokul/Desktop/Data/Equity/EOD/Convert/HINDALCO.csv"
-status = "eod"
+status = "id"
 
 if status == "id":
+    fn = "/Users/gokul/Desktop/Data/Equity/Intraday/Convert/BANKBARODA.csv"
     stock_id = get_data_id(fn, 0)
     datelist = stock_id.get_datelist()
-    date = datelist[1]
-    timelist = stock_id.get_timelist(date)
-    timelength = int(len(timelist))
+    lookback_dates = 1
+    timelength = 0
+    for j in range(lookback_dates):
+        date = datelist[len(datelist) - lookback_dates + j]
+        timelist = stock_id.get_timelist(date)
+        timelength += int(len(timelist))
     x = np.empty(timelength)
-    for i in range(timelength):
-        ohlc = stock_id.get_min_ohlc(date, timelist[i])
-        x[i] = ohlc_classify(ohlc[0], ohlc[1], ohlc[2], ohlc[3])
+    last_index = 0
+    for j in range(lookback_dates):
+        date = datelist[len(datelist) - lookback_dates + j]
+        timelist = stock_id.get_timelist(date)
+        for i in range(int(len(timelist))):
+            ohlc = stock_id.get_min_ohlc(date, timelist[i])
+            x[i+last_index] = ohlc_classify(ohlc[0], ohlc[1], ohlc[2], ohlc[3])
+            if i == int(len(timelist)) - 1:
+                last_index = i + last_index + 1
 elif status == "eod":
+    fn = "/Users/gokul/Desktop/Data/Equity/EOD/Convert/BANKBARODA.csv"
     stock_eod = get_data_eod(fn, 0)
     stock_dates = stock_eod.get_date()
-    timelength = len(stock_dates)
-    x = np.empty(timelength)
     open_prices = stock_eod.get_open_price()
     high_prices = stock_eod.get_high_price()
     low_prices = stock_eod.get_low_price()
     close_prices = stock_eod.get_close_price()
+    timelength = 100
+    x = np.empty(timelength)
     for i in range(timelength):
-        x[i] = ohlc_classify(open_prices[i], high_prices[i], low_prices[i], close_prices[i])
+        t = len(stock_dates) - timelength + i
+        x[i] = ohlc_classify(open_prices[t], high_prices[t], low_prices[t], close_prices[t])
 
-output(x, 0, 100)
-sys.exit()
+# sys.exit()
 # ********************************INITIALIZATION STEP**************************#
 n_data = len(x)
-n_states = 4
+n_states = 2
+
+# sys.exit()
 
 x_states = [7, 8]
 n_xstates = len(x_states)
@@ -55,6 +68,8 @@ for i in range(n_xstates):
     occurence[i] = len(temp) / n_data
 
 print("prior occurence ", occurence)
+
+# sys.exit()
 
 # Initial probability vector for hidden states - pi
 pi = np.empty(n_states)
@@ -75,7 +90,11 @@ for i in range(n_states):
 B = np.empty(shape=(n_xstates, n_states))
 for k in range(n_states):
     for i in range(n_xstates):
-        B[i, k] = occurence[i]
+        B[i, k] = np.random.uniform(low=0.001, high=1.0)
+    B[:, k] = B[:, k] / np.sum(B[:, k])
+# for k in range(n_states):
+#     for i in range(n_xstates):
+#         B[i, k] = occurence[i]
 
 # alpha_sc, beta_sc (scaled alpha and beta matrices), delta, epsilon and cn declaration
 alpha_sc = np.empty(shape=(n_data, n_states))
@@ -164,8 +183,9 @@ while iter_no <= iter_total:
             denominator = np.sum(np.array([alpha_sc[t, k] * beta_sc[t, k] for t in range(n_data)]))
             B[i, k] = numerator / denominator
 
-    print(A)
     print(iter_no)
+    if iter_no % 200 == 0:
+        print(A)
     iter_no = iter_no + 1
 
 # Given the learned parameters above, predicting the probable states for the next observation n+1
@@ -190,6 +210,7 @@ for k in range(n_xstates):
         temp_sum = 0
         for j in range(n_states):
             temp_sum += alpha[-1, j] * A[j, i]
+        # print(temp_sum, B[k, i], px)
         pnext[k] += temp_sum * B[k, i] / px
 
 print("probability of next trade taking the two possible states are ", pnext)
