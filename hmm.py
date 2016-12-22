@@ -1,5 +1,6 @@
 from get_data_class import get_data_id
-from get_states import ohlc_classify
+from get_obs import ohlc_classify
+from get_states import hidden_classify
 from get_data_eod import get_data_eod
 import numpy as np
 import datetime
@@ -12,33 +13,52 @@ def output(x, start, end):
         print(x[i])
     return 0
 
-
 # ********************************READ FILE AND CREATE OBJECT *****************#
 
 # Change filename to point to file location
 status = "id"
 
 if status == "id":
+
     fn = "/Users/gokul/Desktop/Data/Equity/Intraday/Convert/BANKBARODA.csv"
     stock_id = get_data_id(fn, 0)
     datelist = stock_id.get_datelist()
-    lookback_dates = 1
+    lookback_dates = 2
     timelength = 0
     for j in range(lookback_dates):
         date = datelist[len(datelist) - lookback_dates + j]
         timelist = stock_id.get_timelist(date)
         timelength += int(len(timelist))
-    x = np.empty(timelength)
+    op_p = np.empty(timelength)
+    hi_p = np.empty(timelength)
+    lo_p = np.empty(timelength)
+    cl_p = np.empty(timelength)
     last_index = 0
     for j in range(lookback_dates):
         date = datelist[len(datelist) - lookback_dates + j]
         timelist = stock_id.get_timelist(date)
         for i in range(int(len(timelist))):
             ohlc = stock_id.get_min_ohlc(date, timelist[i])
-            x[i+last_index] = ohlc_classify(ohlc[0], ohlc[1], ohlc[2], ohlc[3])
+            op_p[i + last_index] = ohlc[0]
+            hi_p[i + last_index] = ohlc[1]
+            lo_p[i + last_index] = ohlc[2]
+            cl_p[i + last_index] = ohlc[3]
             if i == int(len(timelist)) - 1:
                 last_index = i + last_index + 1
+    op_mean = np.mean(op_p)
+    op_std_dev = np.std(op_p)
+    cl_mean = np.mean(cl_p)
+    cl_std_dev = np.std(cl_p)
+    op_ret = op_std_dev / op_mean
+    cl_ret = cl_std_dev / cl_mean
+    x = np.empty(timelength - 1)
+    h = np.empty(timelength - 1)
+    for i in range(1, timelength):
+        x[i - 1] = ohlc_classify(op_p[i], hi_p[i], lo_p[i], cl_p[i], cl_ret)
+        h[i - 1] = hidden_classify(op_p[i], hi_p[i], lo_p[i], cl_p[i], cl_p[i-1], op_ret)
+
 elif status == "eod":
+
     fn = "/Users/gokul/Desktop/Data/Equity/EOD/Convert/BANKBARODA.csv"
     stock_eod = get_data_eod(fn, 0)
     stock_dates = stock_eod.get_date()
@@ -55,12 +75,14 @@ elif status == "eod":
 # sys.exit()
 # ********************************INITIALIZATION STEP**************************#
 n_data = len(x)
-n_states = 2
+print(x)
+sys.exit()
 
-# sys.exit()
+x_states = [1, 2, 3, 4, 5, 6]
+h_states = [1, 2, 3, 4, 5, 6]
 
-x_states = [7, 8]
 n_xstates = len(x_states)
+n_states = len(h_states)
 
 occurence = np.empty(n_xstates)
 for i in range(n_xstates):
@@ -69,12 +91,11 @@ for i in range(n_xstates):
 
 print("prior occurence ", occurence)
 
-# sys.exit()
-
 # Initial probability vector for hidden states - pi
 pi = np.empty(n_states)
 for i in range(n_states):
-    pi[i] = np.random.uniform(low=0.001, high=1.0)
+    # pi[i] = np.random.uniform(low=0.001, high=1.0)
+    pi[i] = occurence[i]
 
 # Normalization to ensure sum of probabilities = 1
 pi = pi / np.sum(pi)
