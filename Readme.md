@@ -6,9 +6,10 @@ It also has functions that can extract necessary information from the file at wi
 
 The get_states.py file contains a function that creates two states for the observation variable/output variable - denoted by x.
 These states are created by analysing the relationship between the ohlc prices.
-Overall, there are two states that are possible. 
-State 7 means that the closing price for that time interval is lower than the opening price.
-State 8 means that the closing price for that time interval is higher than the opening price.
+
+The various states defined here are based on the returns from the open, high, low and close prices as opposed to the prices themselves. The open returns are calculated based on the previous time period closing prices. The close returns are calculated based on the opening price returns.
+
+Based on the lookback period (the lookback period denotes the number of previous days' data is being considered in the forecasting), the mean and standard deviation of returns are calculated. States are assigned based on where any given opening or closing return lies. For example, if the return lies above the mean and below one standard deviation, the state assigned to that particular price is 1. And so on. The code is available in the file get_states.py 
 
 The hmm.py file is the main file that contains the hidden markov model implementation.
 It first creates the object that takes as input the filename which points to the file where the data is stored.
@@ -25,4 +26,4 @@ based on the values of alpha and beta computed in the expectation step.
 
 The expectation and maximization steps are looped till convergence to an arbitrary level is reached. Convergence is determined based on difference between successive values. 
 
-The learned parameters are used to predict the probability of states in the next time step. This is the expectation step. 
+The learned parameters are used to predict the probability of states in the next time step. This is the prediction step. 
