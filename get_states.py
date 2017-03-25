@@ -1,5 +1,5 @@
 # Given open, high, low and close prices return a state for a given configuration of prices
-def ohlc_classify(op, hi, lo, cl, cl_p. std):
+def hidden_classify(op, hi, lo, cl, cl_p, std):
     op_ret = (op-cl_p)/cl_p
     if op_ret >= -2*std and op_ret < -std:
         return 1
