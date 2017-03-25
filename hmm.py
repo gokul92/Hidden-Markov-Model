@@ -1,6 +1,6 @@
 from get_data_class import get_data_id
-from get_obs import ohlc_classify
 from get_states import hidden_classify
+from get_obs import ohlc_classify
 from get_data_eod import get_data_eod
 import numpy as np
 import datetime
@@ -20,7 +20,7 @@ status = "id"
 
 if status == "id":
 
-    fn = "/Users/gokul/Desktop/Data/Equity/Intraday/Convert/BANKBARODA.csv"
+    fn = "/Users/gokul/Desktop/Finance/Data/Equity/Intraday/Convert/BANKBARODA.csv"
     stock_id = get_data_id(fn, 0)
     datelist = stock_id.get_datelist()
     lookback_dates = 2
@@ -75,8 +75,8 @@ elif status == "eod":
 # sys.exit()
 # ********************************INITIALIZATION STEP**************************#
 n_data = len(x)
-print(x)
-sys.exit()
+#print(x)
+#sys.exit()
 
 x_states = [1, 2, 3, 4, 5, 6]
 h_states = [1, 2, 3, 4, 5, 6]
@@ -126,7 +126,7 @@ beta_base = np.empty(n_states)
 delta = np.empty(shape=(n_data, n_states))
 epsilon = np.empty(shape=(n_data, n_states))
 
-iter_total = 50
+iter_total = 5000
 
 iter_no = 1
 
